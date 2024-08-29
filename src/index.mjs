@@ -1,6 +1,9 @@
 import express from 'express';
 import Posts from './utils/constants.mjs';
 import jwt from 'jsonwebtoken';
+import dotenv from 'dotenv';
+
+dotenv.config();
 const app = express();
 
 app.use(express.json());
@@ -11,8 +14,8 @@ app.listen(PORT,() =>{
 })
 
 
-app.get('/posts', (req, res) => {
-    res.send(Posts).status(200)
+app.get('/posts', authenticateToken, (req, res) => {
+    res.send(Posts.filter(post => post.username === req.user.name)).status(200)
 })
 
 app.post('/login', (req, res) => {
@@ -30,5 +33,22 @@ app.post('/login', (req, res) => {
         name: username,
     }
 
-    jwt.sign(user)
+    const accessToken = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET); // this has no expiration date
+    res.json({accessToken: accessToken})
 })
+
+function authenticateToken(req, res, next) {
+    console.log(req.headers);
+    
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (token == null) return res.sendStatus(401);
+
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, user) => {
+        if (err) return res.sendStatus(403);
+        req.user = user;
+        next();
+    });
+    // we need to send Authorisation bearer token while making request to the server
+}
